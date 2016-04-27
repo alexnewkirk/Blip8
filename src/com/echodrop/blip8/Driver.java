@@ -5,7 +5,8 @@ import java.io.IOException;
 import javax.swing.JFrame;
 
 import com.echodrop.blip8.core.Sys;
-import com.echodrop.blip8.gfx.ScreenPanel;
+import com.echodrop.blip8.ui.BlipEightKeyListener;
+import com.echodrop.blip8.ui.ScreenPanel;
 import com.echodrop.blip8.util.FileUtils;
 
 public class Driver {
@@ -26,6 +27,7 @@ public class Driver {
 				window.setLocationRelativeTo(null);
 				window.setResizable(false);
 				window.pack();
+				window.addKeyListener(new BlipEightKeyListener(chip8));
 				window.setVisible(true);
 			}
 		});

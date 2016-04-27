@@ -1,4 +1,4 @@
-package com.echodrop.blip8.gfx;
+package com.echodrop.blip8.ui;
 
 import java.awt.Color;
 import java.awt.Dimension;
@@ -15,8 +15,8 @@ public class ScreenPanel extends JPanel implements IGraphicsObserver {
 	private Sys chip8;
 	private boolean[][] screen;
 	private int pixelSize = 8;
-	private Color foreground = Color.BLACK;
-	private Color background = Color.WHITE;
+	private Color foreground = Color.GREEN;
+	private Color background = Color.BLACK;
 
 	public ScreenPanel(Sys chip8) {
 		this.chip8 = chip8;

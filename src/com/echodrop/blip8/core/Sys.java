@@ -8,8 +8,8 @@ import java.util.Stack;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import com.echodrop.blip8.gfx.ScreenPanel;
 import com.echodrop.blip8.interfaces.IGraphicsObserver;
+import com.echodrop.blip8.ui.ScreenPanel;
 import com.echodrop.blip8.util.NumberUtils;
 import com.echodrop.blip8.util.StringUtils;
 
@@ -24,28 +24,31 @@ public class Sys {
 	private boolean[][] screen;
 	private List<IGraphicsObserver> observers;
 	private Random gen;
-	private boolean running;
 	private int delayTimer;
 	private int soundTimer;
 	private Timer frameLimiter;
+	private boolean waitingForKey;
+	private byte keyWaitRegister;
 
 	public Sys() {
+		this.observers = new ArrayList<>();
+		this.gen = new Random();
+		this.frameLimiter = new Timer();
+		this.mem = new byte[0xFFF];
+		this.reg = new byte[16];
+		this.screen = new boolean[64][32];
 		init();
 	}
 
 	public void init() {
-		this.mem = new byte[0xFFF];
-		this.reg = new byte[16];
+		clrscrn();
 		this.stack = new Stack<>();
-		this.screen = new boolean[64][32];
-		this.keys = new boolean[0xF];
 		this.pc = 0x200;
-		this.observers = new ArrayList<>();
-		this.gen = new Random();
-		this.running = true;
 		this.delayTimer = 0;
 		this.soundTimer = 0;
-		this.frameLimiter = new Timer();
+		this.waitingForKey = false;
+		this.keyWaitRegister = 0;
+		this.keys = new boolean[16];
 	}
 
 	public char fetch() {
@@ -205,31 +208,38 @@ public class Sys {
 			}
 			break;
 		}
-		
-		if(delayTimer > 0) {
+
+		if (delayTimer > 0) {
 			delayTimer--;
 		}
-		
-		if(soundTimer > 0) {
+
+		if (soundTimer > 0) {
 			soundTimer--;
+		}
+		
+		if(soundTimer == 0) {
+			//play sound here
 		}
 	}
 
 	private void opfx65(char opcode) {
 		int topReg = (opcode & 0xF00) >> 8;
-		for(int i = 0; i <= topReg; i++) {
+		for (int i = 0; i <= topReg; i++) {
 			reg[i] = mem[addressReg + i];
 		}
 	}
 
 	private void opfx55(char opcode) {
 		int topReg = (opcode & 0xF00) >> 8;
-		for(int i = 0; i <= topReg; i++) {
+		for (int i = 0; i <= topReg; i++) {
 			mem[addressReg + i] = reg[i];
 		}
 	}
 
 	private void opfx33(char opcode) {
+		// int r = (opcode & 0xF00) >> 8;
+		// int d = reg[r];
+		// addressReg =
 		throw new RuntimeException("Opcode not yet implemented: 0x" + Integer.toHexString(opcode & 0xFFFF));
 	}
 
@@ -238,7 +248,7 @@ public class Sys {
 	}
 
 	private void opfx1e(char opcode) {
-		byte r = (byte)((opcode & 0xF00) >> 8);
+		byte r = (byte) ((opcode & 0xF00) >> 8);
 		addressReg += reg[r];
 	}
 
@@ -251,43 +261,48 @@ public class Sys {
 	}
 
 	private void opfx0a(char opcode) {
-		throw new RuntimeException("Opcode not yet implemented: 0x" + Integer.toHexString(opcode & 0xFFFF));
+		frameLimiter.cancel();
+		waitingForKey = true;
+		keyWaitRegister = (byte) ((opcode & 0xF00) >> 8);
 	}
 
 	private void opfx07(char opcode) {
-		reg[(opcode & 0xF00) >> 8] = (byte)delayTimer;
+		reg[(opcode & 0xF00) >> 8] = (byte) delayTimer;
 	}
 
 	private void opexa1(char opcode) {
 		int r1 = ((opcode & 0xF00) >> 8);
-		boolean keyPressed = keys[r1];
-		if(!keyPressed) {
+		if (keys[Byte.toUnsignedInt(reg[r1])]) {
 			pc += 2;
 		}
 	}
 
 	private void opex9e(char opcode) {
-		throw new RuntimeException("Opcode not yet implemented: 0x" + Integer.toHexString(opcode & 0xFFFF));
+		int k = ((opcode & 0xF00) >> 8);
+		if (keys[Byte.toUnsignedInt(reg[k])]) {
+			pc += 2;
+		}
 	}
 
 	private void opdxyn(char opcode) {
 		byte rows = (byte) (opcode & 0xF);
 		int x = reg[(opcode & 0xF00) >> 8];
 		int y = reg[(opcode & 0xF0) >> 4];
+		reg[0xF] = 0;
 
 		for (int i = 0; i < rows; i++) {
 			byte rowData = mem[addressReg + i];
 			String bin = StringUtils.zeroLeftPad(Integer.toBinaryString(rowData & 0xFF), 8);
-			for(int j = 0; j < 8; j++) {
+			for (int j = 0; j < 8; j++) {
 				int pixelX = (x + j) % 64;
 				int pixelY = (y + i) % 32;
-				
+
 				boolean pixelToggle = bin.charAt(j) == '1';
-				
-				if(screen[pixelX][pixelY] && pixelToggle) {
+
+				if (screen[pixelX][pixelY] && pixelToggle) {
 					screen[pixelX][pixelY] = false;
 					reg[0xF] = 1;
-				} else if(pixelToggle) {
+				} else if (pixelToggle) {
 					screen[pixelX][pixelY] = true;
 				}
 			}
@@ -320,7 +335,9 @@ public class Sys {
 
 	private void op8xye(char opcode) {
 		int r1 = ((opcode & 0xF00) >> 8);
+		//int r2 = ((opcode & 0xF0) >> 4);
 		reg[0xF] = (byte) (NumberUtils.readBit(0, reg[r1]) ? 1 : 0);
+		//reg[r1] = (byte)(reg[r2] << 1);
 		reg[r1] <<= 1;
 	}
 
@@ -333,7 +350,9 @@ public class Sys {
 
 	private void op8xy6(char opcode) {
 		int r1 = ((opcode & 0xF00) >> 8);
+		//int r2 = ((opcode & 0xF0) >> 4);
 		reg[0xF] = (byte) (NumberUtils.readBit(7, reg[r1]) ? 1 : 0);
+		//reg[r1] = (byte)(reg[r2] >> 1);
 		reg[r1] >>= 1;
 	}
 
@@ -435,13 +454,28 @@ public class Sys {
 
 	public void beginDispatch() {
 		frameLimiter.schedule(new TimerTask() {
-			
+
 			@Override
 			public void run() {
 				step();
 			}
-		}, new Date(), 1);
+		}, new Date(), 3);
 
+	}
+
+	public void keyDown(byte b) {
+		keys[b] = true;
+		if (waitingForKey) {
+			reg[keyWaitRegister] = b;
+			waitingForKey = false;
+			beginDispatch();
+		}
+		System.err.println("KEY DOWN: " + b);
+	}
+
+	public void keyUp(byte b) {
+		keys[b] = false;
+		System.err.println("KEY UP: " + b);
 	}
 
 }
