@@ -1,24 +1,33 @@
 package com.echodrop.blip8.core;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Random;
 import java.util.Stack;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import com.echodrop.blip8.gfx.ScreenPanel;
 import com.echodrop.blip8.interfaces.IGraphicsObserver;
 import com.echodrop.blip8.util.NumberUtils;
+import com.echodrop.blip8.util.StringUtils;
 
 public class Sys {
 
 	private byte[] mem;
 	private byte[] reg;
+	private boolean[] keys;
 	private char addressReg;
 	private char pc;
 	private Stack<Character> stack;
 	private boolean[][] screen;
 	private List<IGraphicsObserver> observers;
 	private Random gen;
+	private boolean running;
+	private int delayTimer;
+	private int soundTimer;
+	private Timer frameLimiter;
 
 	public Sys() {
 		init();
@@ -29,9 +38,14 @@ public class Sys {
 		this.reg = new byte[16];
 		this.stack = new Stack<>();
 		this.screen = new boolean[64][32];
+		this.keys = new boolean[0xF];
 		this.pc = 0x200;
 		this.observers = new ArrayList<>();
 		this.gen = new Random();
+		this.running = true;
+		this.delayTimer = 0;
+		this.soundTimer = 0;
+		this.frameLimiter = new Timer();
 	}
 
 	public char fetch() {
@@ -191,66 +205,94 @@ public class Sys {
 			}
 			break;
 		}
+		
+		if(delayTimer > 0) {
+			delayTimer--;
+		}
+		
+		if(soundTimer > 0) {
+			soundTimer--;
+		}
 	}
 
 	private void opfx65(char opcode) {
-		// TODO Auto-generated method stub
-
+		int topReg = (opcode & 0xF00) >> 8;
+		for(int i = 0; i <= topReg; i++) {
+			reg[i] = mem[addressReg + i];
+		}
 	}
 
 	private void opfx55(char opcode) {
-		// TODO Auto-generated method stub
-
+		int topReg = (opcode & 0xF00) >> 8;
+		for(int i = 0; i <= topReg; i++) {
+			mem[addressReg + i] = reg[i];
+		}
 	}
 
 	private void opfx33(char opcode) {
-		// TODO Auto-generated method stub
-
+		throw new RuntimeException("Opcode not yet implemented: 0x" + Integer.toHexString(opcode & 0xFFFF));
 	}
 
 	private void opfx29(char opcode) {
-		// TODO Auto-generated method stub
-
+		throw new RuntimeException("Opcode not yet implemented: 0x" + Integer.toHexString(opcode & 0xFFFF));
 	}
 
 	private void opfx1e(char opcode) {
-		// TODO Auto-generated method stub
-
+		byte r = (byte)((opcode & 0xF00) >> 8);
+		addressReg += reg[r];
 	}
 
 	private void opfx18(char opcode) {
-		// TODO Auto-generated method stub
-
+		soundTimer = reg[(opcode & 0xF00) >> 8];
 	}
 
 	private void opfx15(char opcode) {
-		// TODO Auto-generated method stub
-
+		delayTimer = reg[(opcode & 0xF00) >> 8];
 	}
 
 	private void opfx0a(char opcode) {
-		// TODO Auto-generated method stub
-
+		throw new RuntimeException("Opcode not yet implemented: 0x" + Integer.toHexString(opcode & 0xFFFF));
 	}
 
 	private void opfx07(char opcode) {
-		// TODO Auto-generated method stub
-
+		reg[(opcode & 0xF00) >> 8] = (byte)delayTimer;
 	}
 
 	private void opexa1(char opcode) {
-		// TODO Auto-generated method stub
-
+		int r1 = ((opcode & 0xF00) >> 8);
+		boolean keyPressed = keys[r1];
+		if(!keyPressed) {
+			pc += 2;
+		}
 	}
 
 	private void opex9e(char opcode) {
-		// TODO Auto-generated method stub
-
+		throw new RuntimeException("Opcode not yet implemented: 0x" + Integer.toHexString(opcode & 0xFFFF));
 	}
 
 	private void opdxyn(char opcode) {
-		// TODO Auto-generated method stub
+		byte rows = (byte) (opcode & 0xF);
+		int x = reg[(opcode & 0xF00) >> 8];
+		int y = reg[(opcode & 0xF0) >> 4];
 
+		for (int i = 0; i < rows; i++) {
+			byte rowData = mem[addressReg + i];
+			String bin = StringUtils.zeroLeftPad(Integer.toBinaryString(rowData & 0xFF), 8);
+			for(int j = 0; j < 8; j++) {
+				int pixelX = (x + j) % 64;
+				int pixelY = (y + i) % 32;
+				
+				boolean pixelToggle = bin.charAt(j) == '1';
+				
+				if(screen[pixelX][pixelY] && pixelToggle) {
+					screen[pixelX][pixelY] = false;
+					reg[0xF] = 1;
+				} else if(pixelToggle) {
+					screen[pixelX][pixelY] = true;
+				}
+			}
+		}
+		notifyAllObservers();
 	}
 
 	private void opcxnnn(char opcode) {
@@ -260,25 +302,25 @@ public class Sys {
 	}
 
 	private void opbnnn(char opcode) {
-		char address = (char)(reg[0x0] + (opcode & 0xFFF));
+		char address = (char) (reg[0x0] + (opcode & 0xFFF));
 		pc = address;
 	}
 
 	private void storeAddress(char opcode) {
-		addressReg = (char)(opcode & 0xFFF);
+		addressReg = (char) (opcode & 0xFFF);
 	}
 
 	private void op9xy0(char opcode) {
 		int r1 = ((opcode & 0xF00) >> 8);
 		int r2 = ((opcode & 0xF0) >> 4);
-		if(reg[r1] != reg[r2]) {
+		if (reg[r1] != reg[r2]) {
 			pc += 2;
 		}
 	}
 
 	private void op8xye(char opcode) {
 		int r1 = ((opcode & 0xF00) >> 8);
-		reg[0xF] = (byte)(NumberUtils.readBit(0, reg[r1]) ? 1 : 0);
+		reg[0xF] = (byte) (NumberUtils.readBit(0, reg[r1]) ? 1 : 0);
 		reg[r1] <<= 1;
 	}
 
@@ -389,6 +431,17 @@ public class Sys {
 
 	private void ret() {
 		pc = stack.pop();
+	}
+
+	public void beginDispatch() {
+		frameLimiter.schedule(new TimerTask() {
+			
+			@Override
+			public void run() {
+				step();
+			}
+		}, new Date(), 1);
+
 	}
 
 }

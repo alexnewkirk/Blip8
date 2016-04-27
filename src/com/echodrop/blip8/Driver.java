@@ -1,4 +1,4 @@
-package com.echodrop.blip8.main;
+package com.echodrop.blip8;
 
 import java.io.IOException;
 
@@ -13,7 +13,7 @@ public class Driver {
 	public static void main(String[] args) throws IOException {
 		
 		Sys chip8 = new Sys();
-		chip8.loadRom(FileUtils.readBytes("stars.ch8"));
+		chip8.loadRom(FileUtils.readBytes("space_invaders.ch8"));
 		ScreenPanel sp = new ScreenPanel(chip8);
 		chip8.registerObserver(sp);
 		
@@ -30,9 +30,7 @@ public class Driver {
 			}
 		});
 		
-		while(true) {
-			chip8.step();
-		}
+		chip8.beginDispatch();
 		
 	}
 
