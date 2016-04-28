@@ -1,12 +1,13 @@
 package com.echodrop.blip8.core;
 
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Random;
 import java.util.Stack;
-import java.util.Timer;
-import java.util.TimerTask;
+
+import javax.swing.Timer;
 
 import com.echodrop.blip8.interfaces.IGraphicsObserver;
 import com.echodrop.blip8.ui.ScreenPanel;
@@ -24,8 +25,8 @@ public class Sys {
 	private boolean[][] screen;
 	private List<IGraphicsObserver> observers;
 	private Random gen;
-	private int delayTimer;
-	private int soundTimer;
+	private byte delayTimer;
+	private byte soundTimer;
 	private Timer frameLimiter;
 	private boolean waitingForKey;
 	private byte keyWaitRegister;
@@ -33,7 +34,12 @@ public class Sys {
 	public Sys() {
 		this.observers = new ArrayList<>();
 		this.gen = new Random();
-		this.frameLimiter = new Timer();
+		this.frameLimiter = new Timer(1, new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				step();
+			}
+		});
 		this.mem = new byte[0xFFF];
 		this.reg = new byte[16];
 		this.screen = new boolean[64][32];
@@ -49,6 +55,7 @@ public class Sys {
 		this.waitingForKey = false;
 		this.keyWaitRegister = 0;
 		this.keys = new boolean[16];
+		frameLimiter.start();
 	}
 
 	public char fetch() {
@@ -82,10 +89,8 @@ public class Sys {
 
 	public void step() {
 		char opcode = fetch();
-
-		System.out.println("PC: " + "0x" + Integer.toHexString(pc - 0x200));
-		System.out.println("0x" + Integer.toHexString(opcode & 0xFFFF));
-		System.out.println();
+//		System.out.println("PC: " + "0x" + Integer.toHexString(pc - 0x200));
+//		System.out.println("0x" + Integer.toHexString(opcode & 0xFFFF));
 
 		switch (opcode & 0xF000) {
 		case 0:
@@ -209,17 +214,16 @@ public class Sys {
 			break;
 		}
 
-		if (delayTimer > 0) {
+		if (Byte.toUnsignedInt(delayTimer) > 0) {
 			delayTimer--;
+		} else {
+			// play sound here
 		}
 
-		if (soundTimer > 0) {
+		if (Byte.toUnsignedInt(soundTimer) > 0) {
 			soundTimer--;
 		}
-		
-		if(soundTimer == 0) {
-			//play sound here
-		}
+
 	}
 
 	private void opfx65(char opcode) {
@@ -249,7 +253,7 @@ public class Sys {
 
 	private void opfx1e(char opcode) {
 		byte r = (byte) ((opcode & 0xF00) >> 8);
-		addressReg += reg[r];
+		addressReg += Byte.toUnsignedInt(reg[r]);
 	}
 
 	private void opfx18(char opcode) {
@@ -261,7 +265,7 @@ public class Sys {
 	}
 
 	private void opfx0a(char opcode) {
-		frameLimiter.cancel();
+		frameLimiter.stop();
 		waitingForKey = true;
 		keyWaitRegister = (byte) ((opcode & 0xF00) >> 8);
 	}
@@ -272,7 +276,7 @@ public class Sys {
 
 	private void opexa1(char opcode) {
 		int r1 = ((opcode & 0xF00) >> 8);
-		if (keys[Byte.toUnsignedInt(reg[r1])]) {
+		if (!keys[Byte.toUnsignedInt(reg[r1])]) {
 			pc += 2;
 		}
 	}
@@ -335,9 +339,9 @@ public class Sys {
 
 	private void op8xye(char opcode) {
 		int r1 = ((opcode & 0xF00) >> 8);
-		//int r2 = ((opcode & 0xF0) >> 4);
+		// int r2 = ((opcode & 0xF0) >> 4);
 		reg[0xF] = (byte) (NumberUtils.readBit(0, reg[r1]) ? 1 : 0);
-		//reg[r1] = (byte)(reg[r2] << 1);
+		// reg[r1] = (byte)(reg[r2] << 1);
 		reg[r1] <<= 1;
 	}
 
@@ -350,9 +354,9 @@ public class Sys {
 
 	private void op8xy6(char opcode) {
 		int r1 = ((opcode & 0xF00) >> 8);
-		//int r2 = ((opcode & 0xF0) >> 4);
+		// int r2 = ((opcode & 0xF0) >> 4);
 		reg[0xF] = (byte) (NumberUtils.readBit(7, reg[r1]) ? 1 : 0);
-		//reg[r1] = (byte)(reg[r2] >> 1);
+		// reg[r1] = (byte)(reg[r2] >> 1);
 		reg[r1] >>= 1;
 	}
 
@@ -453,14 +457,7 @@ public class Sys {
 	}
 
 	public void beginDispatch() {
-		frameLimiter.schedule(new TimerTask() {
-
-			@Override
-			public void run() {
-				step();
-			}
-		}, new Date(), 3);
-
+		frameLimiter.start();
 	}
 
 	public void keyDown(byte b) {
@@ -470,12 +467,10 @@ public class Sys {
 			waitingForKey = false;
 			beginDispatch();
 		}
-		System.err.println("KEY DOWN: " + b);
 	}
 
 	public void keyUp(byte b) {
 		keys[b] = false;
-		System.err.println("KEY UP: " + b);
 	}
 
 }
