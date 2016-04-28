@@ -30,4 +30,5 @@ Should have full compatibility with any _pure_ CHIP-8 ROM (any ROM that does not
 
 ###Resources
 [Wikipedia](https://en.wikipedia.org/wiki/CHIP-8)
+
 [Matthew Mikolay](http://mattmik.com/files/chip8/mastering/chip8.html)
