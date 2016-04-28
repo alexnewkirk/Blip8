@@ -13,8 +13,12 @@ public class Driver {
 	
 	public static void main(String[] args) throws IOException {
 		
+		if(args.length != 1) {
+			throw new IllegalArgumentException("You must specify a ROM filename");
+		}
+		
 		Sys chip8 = new Sys();
-		chip8.loadRom(FileUtils.readBytes("space_invaders.ch8"));
+		chip8.loadRom(FileUtils.readBytes(args[0]));
 		ScreenPanel sp = new ScreenPanel(chip8);
 		chip8.registerObserver(sp);
 		
@@ -33,7 +37,6 @@ public class Driver {
 		});
 		
 		chip8.beginDispatch();
-		
 	}
 
 }

@@ -89,8 +89,8 @@ public class Sys {
 
 	public void step() {
 		char opcode = fetch();
-//		System.out.println("PC: " + "0x" + Integer.toHexString(pc - 0x200));
-//		System.out.println("0x" + Integer.toHexString(opcode & 0xFFFF));
+		// System.out.println("PC: " + "0x" + Integer.toHexString(pc - 0x200));
+		// System.out.println("0x" + Integer.toHexString(opcode & 0xFFFF));
 
 		switch (opcode & 0xF000) {
 		case 0:

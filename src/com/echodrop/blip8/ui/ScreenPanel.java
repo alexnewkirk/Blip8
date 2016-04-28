@@ -14,8 +14,8 @@ public class ScreenPanel extends JPanel implements IGraphicsObserver {
 	private static final long serialVersionUID = -5699590821022780915L;
 	private Sys chip8;
 	private boolean[][] screen;
-	private int pixelSize = 8;
-	private Color foreground = Color.GREEN;
+	private int pixelSize = 10;
+	private Color foreground = Color.CYAN;
 	private Color background = Color.BLACK;
 
 	public ScreenPanel(Sys chip8) {
