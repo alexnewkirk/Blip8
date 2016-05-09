@@ -4,7 +4,7 @@ A CHIP-8 interpreter written in Java. Bits and pieces borrowed from [my GameBoy 
 
 Designed against the CHIP-8 specification as described in [the Wikipedia article.](https://en.wikipedia.org/wiki/CHIP-8)
 
-Should have full compatibility with any _pure_ CHIP-8 ROM (any ROM that does not contain any RCA 1802 machine code).
+Should have good compatibility with any _pure_ CHIP-8 ROM (any ROM that does not contain any RCA 1802 machine code).
 
 ###Keybinds
 | Key | Binding |
